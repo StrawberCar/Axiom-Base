@@ -83,7 +83,8 @@ wandb.init(project="axiom-base-llm", name="tinyLLM-350M-run", config={
 args = TrainingArguments(
     output_dir="tinyLLM",
     overwrite_output_dir=True,
-    per_device_train_batch_size=4,
+    per_device_train_batch_size=16,
+    gradient_accumulation_steps=2,
     num_train_epochs=3,
     learning_rate=3e-4,
     warmup_steps=200,
@@ -91,8 +92,9 @@ args = TrainingArguments(
     save_steps=500,
     save_total_limit=1,
     fp16=True,
+    gradient_checkpointing=True,
     report_to="wandb",
-    dataloader_num_workers=0,
+    dataloader_num_workers=4,
 )
 
 trainer = Trainer(
