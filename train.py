@@ -92,7 +92,7 @@ args = TrainingArguments(
     save_steps=500,
     save_total_limit=1,
     fp16=True,
-    gradient_checkpointing=True,
+    gradient_checkpointing=False,
     report_to="wandb",
     dataloader_num_workers=4,
 )
