@@ -1,3 +1,4 @@
+import wandb
 from transformers import (
     GPT2Config,
     GPT2LMHeadModel,
@@ -94,6 +95,18 @@ def print_parameter_count(model):
 print_parameter_count(model)
 
 # -----------------------
+# W&B Logging
+# -----------------------
+wandb.init(project="axiom-base-llm", name="tinyLLM-100M-run", config={
+    "vocab_size": len(tokenizer),
+    "n_positions": config.n_positions,
+    "n_embd": config.n_embd,
+    "n_layer": config.n_layer,
+    "n_head": config.n_head,
+    "total_params": sum(p.numel() for p in model.parameters()),
+})
+
+# -----------------------
 # Training
 # -----------------------
 args = TrainingArguments(
@@ -111,7 +124,7 @@ args = TrainingArguments(
     save_steps=500,
     save_total_limit=2,
     fp16=True,                           # Mixed precision: cuts VRAM ~40% and speeds up training
-    report_to="none",
+    report_to="wandb",
     dataloader_num_workers=0,
 )
 
