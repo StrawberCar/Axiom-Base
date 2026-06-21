@@ -16,69 +16,39 @@ tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 tokenizer.pad_token = tokenizer.eos_token
 
 # -----------------------
-# Build regular prompt→completion dataset (no roles)
+# Load the whole dataset and chunk into fixed-length blocks
 # -----------------------
-def build_example(prompt, completion):
-    # Compose sample without any role prefixes.
-    # We keep instruction tuning style by masking the prompt, so the model learns
-    # to generate the completion given the prompt.
-    text = f"{prompt}\n{completion}{tokenizer.eos_token}"
+BLOCK_SIZE = 1024
 
-    tokens = tokenizer(text, truncation=True)
-    input_ids = tokens["input_ids"]
+with open("train.txt", "r", encoding="utf-8") as f:
+    text = f.read()
 
-    # Mask the prompt part; only learn on the completion and EOS
-    labels = [-100] * len(input_ids)
-    prompt_prefix = f"{prompt}\n"
-    prefix_ids = tokenizer(prompt_prefix, truncation=True)["input_ids"]
-    start = len(prefix_ids)
-    labels[start:] = input_ids[start:]
+all_ids = tokenizer(text, add_special_tokens=False)["input_ids"]
 
-    return {
-        "input_ids": input_ids,
-        "attention_mask": tokens["attention_mask"],
-        "labels": labels,
-    }
+# Drop the remainder so every block is exactly BLOCK_SIZE tokens
+n_blocks = len(all_ids) // BLOCK_SIZE
+trimmed_ids = all_ids[: n_blocks * BLOCK_SIZE]
 
-def load_examples_from_file(path):
-    with open(path, "r", encoding="utf-8") as f:
-        content = f.read()
+input_ids = [trimmed_ids[i : i + BLOCK_SIZE] for i in range(0, len(trimmed_ids), BLOCK_SIZE)]
 
-    # Split on blank lines to get blocks, no reliance on any role markers
-    blocks = [b.strip() for b in content.split("\n\n")]
-    examples = []
+dataset = Dataset.from_dict({
+    "input_ids": input_ids,
+    "attention_mask": [[1] * BLOCK_SIZE for _ in input_ids],
+    "labels": [ids[:] for ids in input_ids],
+})
 
-    for block in blocks:
-        if not block:
-            continue
-
-        lines = [line.strip() for line in block.splitlines() if line.strip()]
-
-        # Expect exactly two lines per example: first = prompt, second = completion
-        if len(lines) < 2:
-            continue
-
-        prompt = lines[0]
-        completion = lines[1]
-
-        examples.append(build_example(prompt, completion))
-
-    return examples
-
-
-examples = load_examples_from_file("train.txt")
-dataset = Dataset.from_list(examples)
+print(f"Dataset: {len(dataset)} blocks of {BLOCK_SIZE} tokens ({len(dataset) * BLOCK_SIZE:,} tokens total)")
 
 # -----------------------
 # Model
 # -----------------------
 config = GPT2Config(
     vocab_size=len(tokenizer),
-    n_positions=256,
-    n_ctx=256,
-    n_embd=384,
-    n_layer=6,
-    n_head=6,
+    n_positions=1024,
+    n_ctx=1024,
+    n_embd=1024,
+    n_layer=24,
+    n_head=16,
 )
 
 model = GPT2LMHeadModel(config)
@@ -93,7 +63,7 @@ def print_parameter_count(model):
 print_parameter_count(model)
 
 
-wandb.init(project="axiom-base-llm", name="tinyLLM-100M-run", config={
+wandb.init(project="axiom-base-llm", name="tinyLLM-350M-run", config={
     "vocab_size": len(tokenizer),
     "n_positions": config.n_positions,
     "n_embd": config.n_embd,
@@ -108,13 +78,14 @@ wandb.init(project="axiom-base-llm", name="tinyLLM-100M-run", config={
 args = TrainingArguments(
     output_dir="tinyLLM",
     overwrite_output_dir=True,
-    per_device_train_batch_size=2,
-    num_train_epochs=200,
-    learning_rate=5e-4,
+    per_device_train_batch_size=4,
+    num_train_epochs=3,
+    learning_rate=3e-4,
+    warmup_steps=200,
     logging_steps=10,
     save_steps=500,
     save_total_limit=1,
-    fp16=False,
+    fp16=True,
     report_to="wandb",
     dataloader_num_workers=0,
 )
