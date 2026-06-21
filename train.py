@@ -111,7 +111,6 @@ wandb.init(project="axiom-base-llm", name="tinyLLM-100M-run", config={
 # -----------------------
 args = TrainingArguments(
     output_dir="tinyLLM",
-    overwrite_output_dir=True,
     per_device_train_batch_size=2,
     gradient_accumulation_steps=4,       # Effective batch size = 8; helps stabilize 100M training
     num_train_epochs=50,                 # Reduced from 200; 100M params overfit fast on small data
