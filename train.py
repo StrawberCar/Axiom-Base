@@ -8,8 +8,6 @@ from transformers import (
 )
 from datasets import Dataset
 
-MAX_SEQ_LENGTH = 512
-
 # -----------------------
 # Tokenizer
 # -----------------------
@@ -26,13 +24,13 @@ def build_example(prompt, completion):
     # to generate the completion given the prompt.
     text = f"{prompt}\n{completion}{tokenizer.eos_token}"
 
-    tokens = tokenizer(text, truncation=True, max_length=MAX_SEQ_LENGTH)
+    tokens = tokenizer(text, truncation=True)
     input_ids = tokens["input_ids"]
 
     # Mask the prompt part; only learn on the completion and EOS
     labels = [-100] * len(input_ids)
     prompt_prefix = f"{prompt}\n"
-    prefix_ids = tokenizer(prompt_prefix, truncation=True, max_length=MAX_SEQ_LENGTH)["input_ids"]
+    prefix_ids = tokenizer(prompt_prefix, truncation=True)["input_ids"]
     start = len(prefix_ids)
     labels[start:] = input_ids[start:]
 
@@ -76,16 +74,15 @@ dataset = Dataset.from_list(examples)
 # -----------------------
 config = GPT2Config(
     vocab_size=len(tokenizer),
-    n_positions=512,
-    n_ctx=512,
-    n_embd=768,
-    n_layer=8,
-    n_head=12,
+    n_positions=256,
+    n_ctx=256,
+    n_embd=384,
+    n_layer=6,
+    n_head=6,
 )
 
 model = GPT2LMHeadModel(config)
 model.resize_token_embeddings(len(tokenizer))
-
 
 def print_parameter_count(model):
     total_params = sum(p.numel() for p in model.parameters())
@@ -93,12 +90,9 @@ def print_parameter_count(model):
     print(f"Total parameters: {total_params:,}")
     print(f"Trainable parameters: {trainable_params:,}")
 
-
 print_parameter_count(model)
 
-# -----------------------
-# W&B Logging
-# -----------------------
+
 wandb.init(project="axiom-base-llm", name="tinyLLM-100M-run", config={
     "vocab_size": len(tokenizer),
     "n_positions": config.n_positions,
@@ -113,18 +107,14 @@ wandb.init(project="axiom-base-llm", name="tinyLLM-100M-run", config={
 # -----------------------
 args = TrainingArguments(
     output_dir="tinyLLM",
+    overwrite_output_dir=True,
     per_device_train_batch_size=2,
-    gradient_accumulation_steps=4,       # Effective batch size = 8; helps stabilize 100M training
-    num_train_epochs=50,                 # Reduced from 200; 100M params overfit fast on small data
-    learning_rate=1e-4,                  # Lower LR is safer for larger models
-    weight_decay=0.01,                   # Regularization to prevent overfitting
-    max_grad_norm=1.0,                   # Gradient clipping for training stability
-    warmup_steps=200,                    # Slowly ramp LR to prevent early divergence
-    lr_scheduler_type="cosine",          # Smooth decay after warmup
+    num_train_epochs=200,
+    learning_rate=5e-4,
     logging_steps=10,
     save_steps=500,
-    save_total_limit=2,
-    fp16=True,                           # Mixed precision: cuts VRAM ~40% and speeds up training
+    save_total_limit=1,
+    fp16=False,
     report_to="wandb",
     dataloader_num_workers=0,
 )
