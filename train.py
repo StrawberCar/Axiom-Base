@@ -20,14 +20,19 @@ tokenizer.pad_token = tokenizer.eos_token
 # -----------------------
 BLOCK_SIZE = 1024
 
+print("Reading train.txt...", flush=True)
 with open("train.txt", "r", encoding="utf-8") as f:
     text = f.read()
+print(f"Read {len(text):,} characters", flush=True)
 
+print("Tokenizing...", flush=True)
 all_ids = tokenizer(text, add_special_tokens=False)["input_ids"]
+print(f"Tokenized into {len(all_ids):,} tokens", flush=True)
 
 # Drop the remainder so every block is exactly BLOCK_SIZE tokens
 n_blocks = len(all_ids) // BLOCK_SIZE
 trimmed_ids = all_ids[: n_blocks * BLOCK_SIZE]
+print(f"Chunking into {n_blocks:,} blocks of {BLOCK_SIZE} tokens...", flush=True)
 
 input_ids = [trimmed_ids[i : i + BLOCK_SIZE] for i in range(0, len(trimmed_ids), BLOCK_SIZE)]
 
@@ -37,7 +42,7 @@ dataset = Dataset.from_dict({
     "labels": [ids[:] for ids in input_ids],
 })
 
-print(f"Dataset: {len(dataset)} blocks of {BLOCK_SIZE} tokens ({len(dataset) * BLOCK_SIZE:,} tokens total)")
+print(f"Dataset ready: {len(dataset)} blocks of {BLOCK_SIZE} tokens ({len(dataset) * BLOCK_SIZE:,} tokens total)", flush=True)
 
 # -----------------------
 # Model
