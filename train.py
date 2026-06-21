@@ -8,6 +8,8 @@ from transformers import (
 )
 from datasets import Dataset
 
+MAX_SEQ_LENGTH = 512
+
 # -----------------------
 # Tokenizer
 # -----------------------
@@ -24,13 +26,13 @@ def build_example(prompt, completion):
     # to generate the completion given the prompt.
     text = f"{prompt}\n{completion}{tokenizer.eos_token}"
 
-    tokens = tokenizer(text, truncation=True)
+    tokens = tokenizer(text, truncation=True, max_length=MAX_SEQ_LENGTH)
     input_ids = tokens["input_ids"]
 
     # Mask the prompt part; only learn on the completion and EOS
     labels = [-100] * len(input_ids)
     prompt_prefix = f"{prompt}\n"
-    prefix_ids = tokenizer(prompt_prefix, truncation=True)["input_ids"]
+    prefix_ids = tokenizer(prompt_prefix, truncation=True, max_length=MAX_SEQ_LENGTH)["input_ids"]
     start = len(prefix_ids)
     labels[start:] = input_ids[start:]
 
